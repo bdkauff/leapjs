@@ -472,8 +472,57 @@ Connection.prototype.connect = function() {
  * Constructs a Controller object.
  * @class Leap.Controller
  * @classdesc
- * Controller description
+ * The Controller object manages the connection to the Leap. Depending on how 
+ * you use the LeapJS library, you may or may not interact with a controller 
+ * object directly. 
  *
+ * You can get the most recent frame of Leap data from a Controller object at 
+ * any time with the frame() method. If your application has a natural fame 
+ * rate, an efficient strategy is to call the frame() method during your 
+ * application's update loop. (This is the strategy used by the Leap.loop()
+ * mechanism.) 
+ *
+ * **Using an implicit Controller**
+ *
+ * If you use the {@link Leap.loop}() mechanism, a Controller is created for 
+ * you in the background.
+ * ```javascript
+ *    Leap.loop( function( frame ) {
+ *        // ... your code here
+ *    })
+ * ```
+ * The loop function creates the controller, establishes the 
+ * connection to the Leap application and calls your handler function on the 
+ * browser's animation interval (using window.requestAnimationFrame()). 
+ *
+ * **Using an explicit Controller**
+ * If you don't use Leap.loop, create and connect your own Controller as 
+ * follows:
+ *
+ * 1. Create a Controller object: var controller = new Leap.Controller()
+ * 2. Optionally, add callback functions:
+ *
+ *    * onReady handlers are called when the controller is connected.
+ *    * onFrame handlers are called when a new Frame is available.
+ *
+ *    Note that the Leap frame rate can exceed 200 frames per second, depending
+ *    on the operating mode of the Leap application. Take care when using the 
+ *    onFrame handler mechanism to avoid taking too much processing time away
+ *    from other parts of your application. 
+ * 3. Call the Controller connect() method.
+ * 4. If you are not using onFrame handlers, call Controller.frame() whenever
+ *    your application is ready to process a set of Leap tracking data (for 
+ *    example, in the update handler of an animation loop).
+ *
+ * @example
+ *    var controller = new Leap.Controller();
+ *    controller.onFrame(function() {
+ *        console.log("hello")
+ *        console.log(controller.frame().id)
+ *        console.log(controller.frame().fingers.length)
+ *        console.log(controller.frame().finger(0))
+ *    })
+ *    controller.connect()
  */
 var Controller = exports.Controller = function(opts) {
   this.opts = opts;
@@ -500,7 +549,9 @@ var Controller = exports.Controller = function(opts) {
 /**
  * Connects to the Leap application through a WebSocket connection.
  *
- * When the connection is successful, the controller dispatches a
+ * When the connection is successful, the controller invokes any queued
+ * onReady handlers.
+ *
  * @method Leap.Controller.prototype.connect
  */
 Controller.prototype.connect = function() {
@@ -530,9 +581,12 @@ Controller.prototype.frame = function(num) {
 
 /**
  * Assigns a handler function to be called when the Controller object connects 
- * to the Leap software. Called immediately if the 
+ * to the Leap software. The handler is called immediately if the controller is
+ * already connected. Otherwise, the handler function is put in a queue to
+ * be called later.
+ *
  * @method Leap.Controller.prototype.onReady
- * @param {function} handler function parameter description.
+ * @param {function} handler A function to be called when the controller is ready.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 Controller.prototype.onReady = function(handler) {
   if (this.ready) {
@@ -555,9 +609,13 @@ Controller.prototype.processFrame = function(frame) {
 }
 
 /**
- * onFrame() Method description.
+ * Assigns a handler function to be called when the Controller object receives 
+ * a frame from the Leap software. Every assigned handler function is pushed 
+ * into a queue and called for each frame. Removing handlers from the queue is
+ * not supported.
+ *
  * @method Leap.Controller.prototype.onFrame
- * @param {function} handler function parameter description.
+ * @param {function} handler A function to be called for each frame of Leap data.
  */
 Controller.prototype.onFrame = function(handler) {
   this.frameListeners.push(handler);
@@ -586,10 +644,21 @@ Controller.prototype.dispatchFrameEvent = function() {
 }
 
 /**
- * Frame Constructor description.
+ * Constructs a Frame object.
+ *
+ * Frame instances created with this constructor are invalid.
+ * Get valid Frame objects by calling the 
+ * {@link Leap.Controller#frame}() function.
+ *
  * @class Leap.Frame
  * @classdesc
- * Frame description
+ * The Frame class represents a set of hand and finger tracking data detected
+ * in a single frame.
+ *
+ * The Leap detects hands, fingers and tools within the tracking area, reporting
+ * their positions, orientations and motions in frames at the Leap frame rate.
+ *
+ * Access Frame objects using the {@link Leap.Controller#frame}() function.
  *
  * @borrows Motion#translation as #translation
  * @borrows Motion#matrix as #matrix
@@ -600,43 +669,68 @@ Controller.prototype.dispatchFrameEvent = function() {
  */
 var Frame = exports.Frame = function(data) {
   /**
-   * valid property description
+   * Reports whether this Frame instance is valid.
+   *
+   * A valid Frame is one generated by the Controller object that contains
+   * tracking data for all detected entities. An invalid Frame contains no
+   * actual tracking data, but you can call its functions without risk of a
+   * undefined object exception. The invalid Frame mechanism makes it more
+   * convenient to track individual data across the frame history. For example,
+   * you can invoke:
+   *
+   * ```javascript
+   * var finger = controller.frame(n).finger(fingerID);
+   * ```
+   *
+   * for an arbitrary Frame history value, "n", without first checking whether
+   * frame(n) returned a null object. (You should still check that the
+   * returned Finger instance is valid.)
+   *
    * @member Leap.Frame.prototype.valid
    * @type {Boolean}
    */
   this.valid = true
   /**
-   * id property description
+   * A unique ID for this Frame. Consecutive frames processed by the Leap
+   * have consecutive increasing values.
    * @member Leap.Frame.prototype.id
    * @type {String}
    */  
   this.id = data.id
   /**
-   * timestamp desc
+   * The frame capture time in microseconds elapsed since the Leap started.
    * @member Leap.Frame.prototype.timestamp
    * @type {Number}
    */   
   this.timestamp = data.timestamp
   /**
-   * Hands[] desc
+   * The list of Hand objects detected in this frame, given in arbitrary order.
+   * The list can be empty if no hands are detected.
+   *
    * @member Leap.Frame.prototype.hands[]
    * @type {Leap.Hand}
    */
   this.hands = []
   /**
-   * Pointables[] desc
+   * The list of Pointable objects (fingers and tools) detected in this frame,
+   * given in arbitrary order. The list can be empty if no fingers or tools are
+   * detected.
+   *
    * @member Leap.Frame.prototype.pointables[] 
    * @type {Leap.Pointable}
    */
   this.pointables = []
   /**
-   * tools[] desc
+   * The list of Tool objects detected in this frame, given in arbitrary order.
+   * The list can be empty if no tools are detected.
+   *
    * @member Leap.Frame.prototype.tools[] 
    * @type {Leap.Pointable}
    */
   this.tools = []
   /**
-   * fingers[] desc
+   * The list of Finger objects detected in this frame, given in arbitrary order.
+   * The list can be empty if no fingers are detected.
    * @member Leap.Frame.prototype.fingers[]
    * @type {Leap.Pointable}
    */
@@ -664,58 +758,112 @@ var Frame = exports.Frame = function(data) {
 }
 
 /**
- * tool() description.
+ * The tool with the specified ID in this frame.
+ *
+ * Use the Frame tool() function to retrieve a tool from
+ * this frame using an ID value obtained from a previous frame.
+ * This function always returns a Pointable object, but if no tool
+ * with the specified ID is present, an invalid Pointable object is returned.
+ *
+ * Note that ID values persist across frames, but only until tracking of a
+ * particular object is lost. If tracking of a tool is lost and subsequently
+ * regained, the new Pointable object representing that tool may have a
+ * different ID than that representing the tool in an earlier frame.
+ *
  * @method Leap.Frame.prototype.tool
- * @param {String} id Parameter description.
- * @returns {Leap.Pointable | Leap.Pointable.Invalid} Return description.
+ * @param {String} id The ID value of a Tool object from a previous frame.
+ * @returns {Leap.Pointable | Leap.Pointable.Invalid} The tool with the
+ * matching ID if one exists in this frame; otherwise, an invalid Pointable object 
+ * is returned.
  */
 Frame.prototype.tool = function(id) {
   return (id < 0 || id >= this.tools.length) ? window.Leap.Pointable.Invalid : this.tools[id]
 }
 
 /**
- * pointable() description.
+ * The Pointable object with the specified ID in this frame.
+ *
+ * Use the Frame pointable() function to retrieve the Pointable object from
+ * this frame using an ID value obtained from a previous frame.
+ * This function always returns a Pointable object, but if no finger or tool
+ * with the specified ID is present, an invalid Pointable object is returned.
+ *
+ * Note that ID values persist across frames, but only until tracking of a
+ * particular object is lost. If tracking of a finger or tool is lost and subsequently
+ * regained, the new Pointable object representing that finger or tool may have
+ * a different ID than that representing the finger or tool in an earlier frame.
+ *
  * @method Leap.Frame.prototype.pointable
- * @param {String} id Parameter description.
- * @returns {Leap.Pointable | Leap.Pointable.Invalid} Return description.
+ * @param {String} id The ID value of a Pointable object from a previous frame.
+ * @returns {Leap.Pointable | Leap.Pointable.Invalid} The Pointable object with 
+ * the matching ID if one exists in this frame;
+ * otherwise, an invalid Pointable object is returned.
  */
 Frame.prototype.pointable = function(id) {
   return (id < 0 || id >= this.pointables.length) ? window.Leap.Pointable.Invalid : this.pointables[id]
 }
 
 /**
- * finger() description.
+ * The finger with the specified ID in this frame.
+ *
+ * Use the Frame finger() function to retrieve the finger from
+ * this frame using an ID value obtained from a previous frame.
+ * This function always returns a Finger object, but if no finger
+ * with the specified ID is present, an invalid Pointable object is returned.
+ *
+ * Note that ID values persist across frames, but only until tracking of a
+ * particular object is lost. If tracking of a finger is lost and subsequently
+ * regained, the new Pointable object representing that physical finger may have
+ * a different ID than that representing the finger in an earlier frame.
+ *
  * @method Leap.Frame.prototype.finger
- * @param {String} id Parameter description.
- * @returns {Leap.Pointable | Leap.Pointable.Invalid} Return description.
+ * @param {String} id The ID value of a finger from a previous frame.
+ * @returns {Leap.Pointable | Leap.Pointable.Invalid} The finger with the 
+ * matching ID if one exists in this frame; otherwise, an invalid Pointable 
+ * object is returned.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 Frame.prototype.finger = function(id) {
   return (id < 0 || id >= this.fingers.length) ? window.Leap.Pointable.Invalid : this.fingers[id]
 }
 
 /**
- * hand() description.
+ * The Hand object with the specified ID in this frame.
+ *
+ * Use the Frame hand() function to retrieve the Hand object from
+ * this frame using an ID value obtained from a previous frame.
+ * This function always returns a Hand object, but if no hand
+ * with the specified ID is present, an invalid Hand object is returned.
+ *
+ * Note that ID values persist across frames, but only until tracking of a
+ * particular object is lost. If tracking of a hand is lost and subsequently
+ * regained, the new Hand object representing that physical hand may have
+ * a different ID than that representing the physical hand in an earlier frame.
+ *
  * @method Leap.Frame.prototype.hand
- * @param {String} id Parameter description.
- * @returns {Leap.Hand | Leap.Hand.Invalid} Return description.
+ * @param {String} id The ID value of a Hand object from a previous frame.
+ * @returns {Leap.Hand | Leap.Hand.Invalid} The Hand object with the matching 
+ * ID if one exists in this frame; otherwise, an invalid Hand object is returned.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 Frame.prototype.hand = function(id) {
   return (id < 0 || id >= this.hands.length) ? window.Leap.Hand.Invalid : this.hands[id]
 }
 
 /**
- * toString() description.
+ * A string containing a brief, human readable description of the Frame object.
+ *
  * @method Leap.Frame.prototype.toString
- * @returns {String} Return description.
+ * @returns {String} A brief description of this frame.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 Frame.prototype.toString = function() {
   return "frame id:"+this.id+" timestamp:"+this.timestamp+" hands("+this.hands.length+") pointables("+this.pointables.length+")"
 }
 
 /**
- * dump() description.
+ * Returns a JSON-formatted string containing the hands and pointables in this 
+ * frame.
+ *
  * @method Leap.Frame.prototype.dump
- * @returns {String} Return description.
+ * @returns {String} A JSON-formatted string.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 Frame.prototype.dump = function() {
   var out = this.toString();
@@ -732,7 +880,12 @@ Frame.prototype.dump = function() {
 }
 
 /**
- * Frame.Invalid description.
+ * An invalid Frame object.
+ *
+ * You can use this invalid Frame in comparisons testing
+ * whether a given Frame instance is valid or invalid. (You can also check the
+ * {@link Leap.Frame#valid} property.) 
+ *
  * @constant
  * @type {Leap.Frame}
  * @name Leap.Frame.Invalid
@@ -748,10 +901,25 @@ Frame.Invalid = {
 }
 
 /**
- * Hand Constructor description.
+ * Constructs a Hand object.
+ *
+ * An uninitialized hand is considered invalid.
+ * Get valid Hand objects from a Frame object.
  * @class Leap.Hand
+ *
  * @classdesc
- * Hand description
+ * The Hand class reports the physical characteristics of a detected hand.
+ *
+ * Hand tracking data includes a palm position and velocity; vectors for
+ * the palm normal and direction to the fingers; properties of a sphere fit
+ * to the hand; and lists of the attached fingers and tools.
+ *
+ * Note that Hand objects can be invalid, which means that they do not contain
+ * valid tracking data and do not correspond to a physical entity. Invalid Hand
+ * objects can be the result of asking for a Hand object using an ID from an
+ * earlier frame when no Hand objects with that ID exist in the current frame.
+ * A Hand object created from the Hand constructor is also invalid.
+ * Test for validity with the {@link Leap.Hand#valid} property.
  *
  * @borrows Motion#translation as #translation
  * @borrows Motion#matrix as #matrix
@@ -762,67 +930,111 @@ Frame.Invalid = {
  */
 var Hand = exports.Hand = function(data) {
   /**
-   * id property description
+   * A unique ID assigned to this Hand object, whose value remains the same
+   * across consecutive frames while the tracked hand remains visible. If
+   * tracking is lost (for example, when a hand is occluded by another hand
+   * or when it is withdrawn from or reaches the edge of the Leap field of view),
+   * the Leap may assign a new ID when it detects the hand in a future frame.
+   *
+   * Use the ID value with the {@link Leap.Frame.hand}() function to find this 
+   * Hand object in future frames.
+   *
    * @member Leap.Hand.prototype.id
    * @type {String}
    */
   this.id = data.id
   /**
-   * palmPosition property description
+   * The center position of the palm in millimeters from the Leap origin.
    * @member Leap.Hand.prototype.palmPosition
    * @type {Array: [x,y,z]}
    */
   this.palmPosition = data.palmPosition
   /**
-   * palmDirection property description
+   * The direction from the palm position toward the fingers.
+   *
+   * The direction is expressed as a unit vector pointing in the same
+   * direction as the directed line from the palm position to the fingers.
+   *
    * @member Leap.Hand.prototype.palmDirection
    * @type {Array: [x,y,z]}
    */
   this.palmDirection = data.palmDirection
   /**
-   * palmVelocity property description
+   * The rate of change of the palm position in millimeters/second.
+   *
    * @member Leap.Hand.prototype.palmVeclocity
    * @type {Array: [Vx,Vy,Vz]}
    */
   this.palmVelocity = data.palmVelocity
   /**
-   * palmNormal property description
+   * The normal vector to the palm. If your hand is flat, this vector will
+   * point downward, or "out" of the front surface of your palm.
+   *
+   * <img src="images/Leap_Palm_Vectors.png"/>
+   *
+   * The direction is expressed as a unit vector pointing in the same
+   * direction as the palm normal (that is, a vector orthogonal to the palm).
    * @member Leap.Hand.prototype.palmNormal
    * @type {Array: [x,y,z]}
    */
   this.palmNormal = data.palmNormal
   /**
-   * sphereCenter property description
+   * The center of a sphere fit to the curvature of this hand.
+   *
+   * This sphere is placed roughly as if the hand were holding a ball.
+   *
+   * <img src="images/Leap_Hand_Ball.png"/>
    * @member Leap.Hand.prototype.sphereCenter
    * @type {Array: [x,y,z]}
    */   
   this.sphereCenter = data.sphereCenter
   /**
-   * sphereRadius property description
+   * The radius of a sphere fit to the curvature of this hand, in millimeters.
+   *
+   * This sphere is placed roughly as if the hand were holding a ball. Thus the
+   * size of the sphere decreases as the fingers are curled into a fist.
+   *
    * @member Leap.Hand.prototype.sphereRadius
    * @type {Number}
    */
   this.sphereRadius = data.sphereRadius
   /**
-   * valid property description
+   * Reports whether this is a valid Hand object.
+   *
    * @member Leap.Hand.prototype.valid
    * @type {Boolean}
    */
   this.valid = true
   /**
-   * Pointables[] desc
+   * The list of Pointable objects (fingers and tools) detected in this frame
+   * that are associated with this hand, given in arbitrary order. The list
+   * can be empty if no fingers or tools associated with this hand are detected.
+   *
+   * Use the {@link Leap.Pointable} tool property to determine
+   * whether or not an item in the list represents a tool or finger.
+   * You can also get only the tools using the Hand.tools[] list or
+   * only the fingers using the Hand.fingers[] list.
+   *
    * @member Leap.Hand.prototype.pointables[] 
    * @type {Leap.Pointable}
    */
   this.pointables = []
   /**
-   * fingers[] desc
+   * The list of fingers detected in this frame that are attached to
+   * this hand, given in arbitrary order.
+   *
+   * The list can be empty if no fingers attached to this hand are detected.
+   *
    * @member Leap.Frame.prototype.fingers[]
    * @type {Leap.Pointable}
    */
   this.fingers = []
   /**
-   * tools[] desc
+   * The list of tools detected in this frame that are held by this
+   * hand, given in arbitrary order.
+   *
+   * The list can be empty if no tools held by this hand are detected.
+   *
    * @member Leap.Hand.prototype.tools[] 
    * @type {Leap.Pointable}
    */
@@ -834,26 +1046,45 @@ var Hand = exports.Hand = function(data) {
 }
 
 /**
- * finger() description.
+ * The finger with the specified ID attached to this hand.
+ *
+ * Use this function to retrieve a Pointable object representing a finger 
+ * attached to this hand using an ID value obtained from a previous frame.
+ * This function always returns a Pointable object, but if no finger
+ * with the specified ID is present, an invalid Pointable object is returned.
+ *
+ * Note that the ID values assigned to fingers persist across frames, but only 
+ * until tracking of a particular finger is lost. If tracking of a finger is 
+ * lost and subsequently regained, the new Finger object representing that 
+ * finger may have a different ID than that representing the finger in an 
+ * earlier frame.
+ *
  * @method Leap.Hand.prototype.finger
- * @param {String} id Parameter description.
- * @returns {Leap.Pointable | Leap.Pointable.Invalid} Return description.
+ * @param {String} id The ID value of a finger from a previous frame.
+ * @returns {Leap.Pointable | Leap.Pointable.Invalid} The Finger object with 
+ * the matching ID if one exists for this hand in this frame; otherwise, an 
+ * invalid Finger object is returned.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
 Hand.prototype.finger = function(id) {
   return (id < 0 || id >= this.fingers.length) ? Leap.Pointable.Invalid : this.fingers[id]
 }
 
 /**
- * toString() description.
+ * A string containing a brief, human readable description of the Hand object.
  * @method Leap.Hand.prototype.toString
- * @returns {String} Return description.
+ * @returns {String} A description of the Hand as a string.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 Hand.prototype.toString = function() {
   return "Hand [ id: "+ this.id + " data:"+JSON.stringify(this.data)+"] ";
 }
 
 /**
- * Hand.Invalid description.
+ * An invalid Hand object.
+ *
+ * You can use an invalid Hand object in comparisons testing
+ * whether a given Hand instance is valid or invalid. (You can also use the
+ * Hand valid property.)
+ *
  * @constant
  * @type {Leap.Hand}
  * @name Leap.Hand.Invalid
@@ -861,8 +1092,33 @@ Hand.prototype.toString = function() {
 Hand.Invalid = { valid: false }
 
 /**
- * loop() function description
- * @name Leap.loop
+ * The Leap.loop() function passes a frame of Leap data to your
+ * callback function and then calls window.requestAnimationFrame() after 
+ * executing your callback function.
+ * 
+ * Leap.loop() sets up the Leap controller and WebSocket connection for you.
+ * You do not need to create your own controller when using this method.
+ *
+ * Your callback function is called on an interval determined by the client 
+ * browser. Typically, this is on an interval of 60 frames/second. The most
+ * recent frame of Leap data is passed to your callback function. If the Leap
+ * is producing frames at a slower rate than the browser frame rate, the same
+ * frame of Leap data can be passed to your function in successive animation 
+ * updates.
+ *
+ * As an alternative, you can create your own Controller object and use a
+ * {@link Leap.Controller#onFrame onFrame} callback to process the data at
+ * the frame rate of the Leap device. See {@link Leap.Controller} for an 
+ * example.
+ *
+ * @method Leap.loop
+ * @param {function} callback A function called when the browser is ready to 
+ * draw to the screen. The most recent {@link Leap.Frame} object is passed to  
+ * your callback function.
+ * @example
+ *    Leap.loop( function( frame ) {
+ *        // ... your code here
+ *    })
  */
 exports.loop = function(callback) {
   var controller = new Leap.Controller()
@@ -877,16 +1133,29 @@ exports.loop = function(callback) {
 }
 
 /**
- * multiply() function description
- *@name Leap.multiply
+ * A utility function to multiply a vector represented by a 3-element array
+ * by a scalar.
+ *
+ * @method Leap.multiply
+ * @param {Array: [x,y,z]} vec An array containing three elements representing
+ * coordinates in 3-dimensional space.
+ * @param {Number} c A scalar value.
+ * @returns {Array: [c*x, c*y, c*z]} The product of a 3-d vector and a scalar.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 var multiply = function(vec, c) {
   return [vec[0] * c, vec[1] * c, vec[2] * c]
 };
 
 /**
- * normalize() function description
- * @name Leap.normalize
+ * A utility function to normalize a vector represented by a 3-element array.
+ * 
+ * A normalized vector has the same direction as the original, but a length 
+ * of 1.0.
+ *
+ * @method Leap.normalize
+ * @param {Array: [x,y,z]} vec An array containing three elements representing
+ * coordinates in 3-dimensional space.
+ * @returns {Array: [x,y,z]} The normalized vector.
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 var normalize = function(vec) {
   var denom = vec[0]*vec[0] + vec[1]*vec[1] + vec[2]*vec[2];
@@ -907,10 +1176,25 @@ var Motion = exports.Motion = {
     return this._matrix = $M(this.rotation);
   },
   /**
-   * translation() method description.
+   * The change of position derived from the linear motion between
+   * the current frame and the specified frame.
+   *
+   * The returned translation vector provides the magnitude and direction of
+   * the movement in millimeters.
+   *
+   * The Leap derives frame translation from the linear motion of
+   * all objects detected in the field of view. It derives hand translation
+   * from the linear motion of the hand and any associated fingers and tools.
+   *
+   * If either this frame or fromFrame is an invalid Frame object, then this
+   * method returns a zero vector.
+   *
    * @method Motion.prototype.translation
-   * @param {Leap.Frame} fromFrame A different frame description.
-   * @returns {Array: [x,y,z]} Translation Return description.
+   * @param {Leap.Frame} fromFrame The starting frame for computing the 
+   * relative translation.
+   * @returns {Array: [x,y,z]} A vector representing the heuristically 
+   * determined change in position of all objects between the current frame 
+   * and that specified in the fromFrame parameter.
    */
   translation: function(fromFrame) {
     if (!this.valid || !fromFrame.valid) {
@@ -934,11 +1218,27 @@ var Motion = exports.Motion = {
     return normalize(vec);
   },
   /**
-   * rotationAngle description
+   * The angle of rotation around the rotation axis derived from the overall
+   * rotational motion between the current frame and the specified frame.
+   *
+   * The returned angle is expressed in radians measured clockwise around the
+   * rotation axis (using the right-hand rule) between the start and end frames.
+   * The value is always between 0 and pi radians (0 and 180 degrees).
+   *
+   * The Leap derives frame rotation from the relative change in position and
+   * orientation of all objects detected in the field of view. It derives
+   * hand rotation from the rotation of the hand and any associated fingers 
+   * and tools.
+   *
+   * If either this frame or fromFrame is an invalid Frame object, then the
+   * angle of rotation is zero.
    *
    * @method Motion.prototype.rotationAngle
-   * @param {Leap.Frame} fromFrame A different frame description.
-   * @returns {Number|NaN} rotationAngle Return description.
+   * @param {Leap.Frame} fromFrame The starting frame for computing the 
+   * relative rotation.
+   * @returns {Number} A positive value containing the heuristically 
+   * determined rotational change between the current frame and that specified 
+   * in the fromFrame parameter.
    */
   rotationAngle: function(fromFrame) {
     if (!this.valid || !fromFrame.valid) return 0.0;
@@ -948,22 +1248,49 @@ var Motion = exports.Motion = {
     return angle === NaN ? 0.0 : angle;
   },
   /**
-   * rotationMatrix description
+   * The transform matrix expressing the rotation derived from the overall
+   * rotational motion between the current frame and the specified frame.
+   *
+   * The Leap derives frame rotation from the relative change in position and
+   * orientation of all objects detected in the field of view. It derives hand
+   * rotation from the rotation of a hand and any associated fingers and tools.
+   *
+   * If either this frame or fromFrame is an invalid Frame object, then this
+   * method returns an identity matrix.
    *
    * @method Motion.prototype.rotationMatrix
-   * @param {Leap.Frame} fromFrame A different frame description.
-   * @returns {Sylvester.Matrix} rotationMatrix Return description.
+   * @param {Leap.Frame} fromFrame The starting frame for computing the 
+   * relative rotation.
+   * @returns {Sylvester.Matrix} A transformation matrix containing the
+   * heuristically determined rotational change between the current frame and 
+   * that specified in the fromFrame parameter.
    */
   rotationMatrix: function(fromFrame) {
     if (!this.valid || !fromFrame.valid) $M.I(3);
     return this.matrix().transpose().multiply(fromFrame.matrix());
   },
   /**
-   * scaleFactor description
+   * The scale factor derived from the motion between the current frame
+   * and the specified frame.
+   *
+   * The scale factor is always positive. A value of 1.0 indicates no
+   * scaling took place. Values between 0.0 and 1.0 indicate contraction
+   * and values greater than 1.0 indicate expansion.
+   *
+   * The Leap derives scaling for a frame from the relative inward or outward 
+   * motion of all objects detected in the field of view (independent of 
+   * translation and rotation). It derives scaling for a hand from the spread
+   * of the associated hands and fingers.
+   *
+   * If either this frame or fromFrame is an invalid Frame object, then this
+   * method returns 1.0.
    *
    * @method Motion.prototype.scaleFactor
-   * @param {Leap.Frame} fromFrame A different frame description.
-   * @returns {Number} scaleFactor Return description.
+   * @param {Leap.Frame} fromFrame The starting frame for computing the 
+   * relative scaling.
+   * @returns {Number} scaleFactor A positive value representing the 
+   * heuristically determined scaling change ratio between the current frame 
+   * and that specified in the fromFrame parameter.
    */
   scaleFactor: function(fromFrame) {
     if (!this.valid || !fromFrame.valid) 1.0;
@@ -972,64 +1299,126 @@ var Motion = exports.Motion = {
 }
 
 /**
- * Pointable constructor description.
+ * Constructs a Pointable object.
+ *
+ * An uninitialized pointable is considered invalid.
+ * Get valid Pointable objects from a Frame or a Hand object.
+ * 
  * @class Leap.Pointable
  * @classdesc
- * Pointable description
+ * The Pointable class reports the physical characteristics of a detected 
+ * finger or tool.
+ *
+ * Both fingers and tools are classified as Pointable objects. Use the 
+ * Pointable.tool property to determine whether a Pointable object represents a
+ * tool or finger. The Leap classifies a detected entity as a tool when it is
+ * thinner, straighter, and longer than a typical finger.
+ *
+ * Note that Pointable objects can be invalid, which means that they do not 
+ * contain valid tracking data and do not correspond to a physical entity. 
+ * Invalid Pointable objects can be the result of asking for a Pointable object 
+ * using an ID from an earlier frame when no Pointable objects with that ID 
+ * exist in the current frame. A Pointable object created from the Pointable
+ * constructor is also invalid. Test for validity with the Pointable.valid 
+ * property. 
  */
 var Pointable = exports.Pointable = function(data) {
   /**
-   * valid property description
+   * Indicates whether this is a valid Pointable object.
+   *
    * @member Leap.Pointable.prototype.valid {Boolean}
    */
   this.valid = true
   /**
-   * id property description
+   * A unique ID assigned to this Pointable object, whose value remains the
+   * same across consecutive frames while the tracked finger or tool remains
+   * visible. If tracking is lost (for example, when a finger is occluded by
+   * another finger or when it is withdrawn from the Leap field of view), the
+   * Leap may assign a new ID when it detects the entity in a future frame.
+   *
+   * Use the ID value with the pointable() functions defined for the 
+   * {@link Leap.Frame} and {@link Frame.Hand} classes to find this
+   * Pointable object in future frames.
+   *
    * @member Leap.Pointable.prototype.id {String}
    */
   this.id = data.id
   /**
-   * length property description
+   * The estimated length of the finger or tool in millimeters.
+   *
+   * The reported length is the visible length of the finger or tool from the
+   * hand to tip. If the length isn't known, then a value of 0 is returned.
+   *
    * @member Leap.Pointable.prototype.length {Number}
    */
   this.length = data.length
   /**
-   * tool property description
+   * Whether or not the Pointable is believed to be a tool.
+   * Tools are generally longer, thinner, and straighter than fingers.
+   *
+   * If tool is false, then this Pointable must be a finger.
+   *
    * @member Leap.Pointable.prototype.tool {Boolean}
    */
   this.tool = data.tool
   /**
-   * width property description
+   * The estimated width of the tool in millimeters.
+   *
+   * The reported width is the average width of the visible portion of the
+   * tool from the hand to the tip. If the width isn't known,
+   * then a value of 0 is returned.
+   *
+   * Pointable objects representing fingers do not have a width property.
+   *
    * @member Leap.Pointable.prototype.width {Number}
    */
   this.width = data.width
   /**
-   * direction property description
+   * The direction in which this finger or tool is pointing.
+   *
+   * The direction is expressed as a unit vector pointing in the same
+   * direction as the tip.
+   *
+   * <img src="images/Leap_Finger_Model.png"/>
    * @member Leap.Pointable.prototype.direction {Array: [x,y,z]}
    */
   this.direction = data.direction
   /**
-   * tipPosition property description
+   * The tip position in millimeters from the Leap origin.
+   *
    * @member Leap.Pointable.prototype.tipPosition {Array: [x,y,z]}
    */
   this.tipPosition = data.tipPosition
   /**
-   * tipVelocity property description
+   * The rate of change of the tip position in millimeters/second.
+   *
    * @member Leap.Pointable.prototype.tipVelocity {Array: [Vx,Vy,Vz]}
    */
   this.tipVelocity = data.tipVelocity
 }
 
 /**
- * Pointable.Invalid description.
- * @constant
- * @type {Leap.Pointable}
- * @name Leap.Pointable.Invalid
- */
+ * A string containing a brief, human readable description of the Pointable
+ * object.
+ *
+ * @method Leap.Pointable.prototype.toString
+ * @returns {String} A description of the Pointable object as a string.
+ */   
 Pointable.prototype.toString = function() {
   return "pointable id:" + this.id + " " + this.length + "mmx" + this.width + "mm " + this.direction;
 }
 
+/**
+ * An invalid Pointable object.
+ *
+ * You can use this Pointable instance in comparisons testing
+ * whether a given Pointable instance is valid or invalid. (You can also use the
+ * Pointable.valid property.)
+ 
+ * @constant
+ * @type {Leap.Pointable}
+ * @name Leap.Pointable.Invalid
+ */
 Pointable.Invalid = { valid: false }
 
 // === Sylvester ===
@@ -1055,20 +1444,25 @@ Pointable.Invalid = { valid: false }
 // DEALINGS IN THE SOFTWARE.
 
 /**
+ * A vector and matrix library for JavaScript. See 
+ * <a href="http://sylvester.jcoglan.com" target="sly">Sylvester: Vector 
+ * and Matrix Math for JavaScript</a> for documentation.
+ *
  * @namespace Sylvester
- * @see <a href="http://sylvester.jcoglan.com" target="sly">Sylvester: Vector 
- * and Matrix Math for JavaScript</a>
+ * 
  */
 var Sylvester = {
   version: '0.1.3',
   precision: 1e-6
 };
 
-/**
- * Vector Constructor description.
+/*
+ * Creates a Vector.
+ * Note: Not currently used in the LeapJS library.
  * @class Sylvester.Vector
  * @classdesc
- * Vector description
+ * @see <a href="http://sylvester.jcoglan.com" target="sly">Sylvester: Vector 
+ * and Matrix Math for JavaScript</a>
  */                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
 function Vector() {}
 Vector.prototype = {
@@ -1372,12 +1766,12 @@ Vector.Zero = function(n) {
 
 
 /**
- * Matrix Constructor description.
+ * Use Matrix.create(elements) to construct a Matrix.
  * @class Sylvester.Matrix
  * @classdesc
- * Matrix class from the Sylvester library. 
- * @see <a href="http://sylvester.jcoglan.com/api/matrix.html" target="sly">
- * Sylvester Matrix Documentation.</a>
+ * The Matrix class from the Sylvester library. 
+ * See <a href="http://sylvester.jcoglan.com/api/matrix.html" target="sly">
+ * Sylvester Matrix Documentation</a> for details.
  */ 
 function Matrix() {}
 Matrix.prototype = {
