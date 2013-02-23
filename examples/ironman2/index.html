@@ -111,6 +111,66 @@
 
 
 
+      //particle system
+      var fingerPosX = 0;
+      var fingerPosY = 0;
+      var fingerPosZ = 0;
+      attributes = []
+      numParticles = 250
+
+      sprite = THREE.ImageUtils.loadTexture('media/particle.png')
+      material =  new THREE.ParticleBasicMaterial( {
+                color: 0xFFFFFF,
+                size: 20, 
+                map: sprite,
+                transparent: true,
+                // opacity: .1,
+                // blending: THREE.AdditiveBlending
+               } )
+
+
+      geometry = new THREE.Geometry()
+      for(var i=0; i < numParticles; i++){
+        position = new THREE.Vector3( 0, 0, 0 )
+        velocity = new THREE.Vector3( Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5 )
+        force = new THREE.Vector3( 0, 0, 0 )
+        geometry.vertices.push( position )
+        var thisAttr = { vel: {x: 0, y: Math.random(), z: 0}, lifespan: Math.random() * 2000, acc: Math.random()*2-1 }
+        attributes.push(thisAttr)
+      }
+
+
+      function updateParticle(){
+        for(var i = 0; i< numParticles; i++){
+          v = attributes[i].vel
+          p = particleSys.geometry.vertices[i]
+          attributes[i].lifespan -= 5
+          if( isDead(i) ){
+            p.x = fingerPosX + Math.random()*5
+            p.y = fingerPosY + Math.random()*5
+            p.z = fingerPosZ
+            attributes[i].lifespan = 100
+          }
+        }
+      }
+
+      function isDead(thisone){
+        if(attributes[thisone].lifespan <= 0.0){
+          return true
+        }else{
+          return false
+        }
+      }
+
+
+      particleSys = new THREE.ParticleSystem( geometry, material )
+      particleSys.sortParticles = true
+      scene.add(particleSys)
+
+
+
+
+
 
       //left palm
       window.leftPalm = new THREE.Mesh(
@@ -143,6 +203,15 @@
       Leap.loop(function(frame) {
 
         if(frame.hands != undefined){
+
+          //if user is pointing with single fingure
+          if(frame.pointables.length > 0){
+            console.log(frame.pointables[0].tipPosition)
+              updateParticle()
+              fingerPosX = frame.pointables[0].tipPosition[0]
+              fingerPosY = frame.pointables[0].tipPosition[1]-200
+              fingerPosZ = frame.pointables[0].tipPosition[2]
+          }
 
           //if there are 2 hands in the frame
           if(frame.hands.length == 2){
