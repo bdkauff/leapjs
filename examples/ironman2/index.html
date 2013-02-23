@@ -3,10 +3,9 @@
     <title>Iron Man 2 - Leap</title>
     <style>
       body{margin: 0px; padding: 0px;}
-      canvas { width: 100%; height: 100%; background-color: black; }
+      canvas { width: 100%; height: 100%; background-color: black; background-image: url('media/bg.jpg');}
     </style>
     <script src="scripts/three.js"></script>
-    <script charset="utf-8" src="scripts/ColladaLoader.js"></script>
     <script src="scripts/leap.js"></script>
   </head>
   <body>
@@ -51,27 +50,71 @@
       camera.position.set( 0, 0, 290 )
 
 
-    //AIRPLANE MODEL
-    airplane = new THREE.Object3D()
-    var modelPlane;
-    var loader = new THREE.ColladaLoader();
-    loader.options.convertUpAxis = true;
-    loader.load( 'media/Av8B.dae', function ( collada ) {
-      modelPlane = collada.scene;
-      modelPlane.scale.x =modelPlane.scale.y =modelPlane.scale.z = 12;
-      modelPlane.position.x= 0;
-      modelPlane.position.y= -20;
-  
-      modelPlane.rotation.set(0,0,0); // Set initial rotation
-  
-      airplane.add(modelPlane)
-    });
-    scene.add(airplane)
+      //earth object
+      earthObject = new THREE.Object3D()
+
+      //earth wireframe
+      window.earthWireframe = new THREE.Mesh(
+        new THREE.SphereGeometry( 40+1, 32, 32 ),
+        new THREE.MeshBasicMaterial({ 
+          color: 0xabd7e5,
+          wireframe: true,
+          transparent: true,
+          opacity: .1
+        })
+      )
+      earthWireframe.position.set( 0, 0, 0 )
+      earthObject.add( earthWireframe )
+
+      //add earth object to scene
+      scene.add(earthObject)
+
+      //earth continents
+      window.earthCont = new THREE.Mesh(
+        new THREE.SphereGeometry( 40, 32, 32 ),
+        new THREE.MeshBasicMaterial({ 
+          color: 0xacd3e3,
+          transparent: true,
+          map: THREE.ImageUtils.loadTexture('media/earthCont2.png')
+        })
+      )
+      earthCont.position.set( 0, 0, 0 )
+      earthObject.add( earthCont )
+
+      //earth continents
+      window.torus1 = new THREE.Mesh(
+        new THREE.TorusGeometry( 43, 1, 30, 30 ),
+        new THREE.MeshBasicMaterial({ 
+          color: 0x4073a2,
+          transparent: true,
+          opacity: .8
+        })
+      )
+      torus1.position.set( 0, 0, 0 )
+      earthObject.add( torus1 )
+
+      //earth continents
+      window.torus2 = new THREE.Mesh(
+        new THREE.TorusGeometry( 43, 1, 30, 30 ),
+        new THREE.MeshBasicMaterial({ 
+          color: 0x4073a2,
+          transparent: true,
+          opacity: .8
+        })
+      )
+      torus2.rotation.y = 1.57
+      torus2.position.set( 0, 0, 0 )
+      earthObject.add( torus2 )
+
+      //add earth object to scene
+      scene.add(earthObject)
+
+
 
 
       //left palm
       window.leftPalm = new THREE.Mesh(
-        new THREE.SphereGeometry( 30, 32, 32 ),
+        new THREE.SphereGeometry( 10, 32, 32 ),
         new THREE.MeshLambertMaterial({ 
           color: 0x0000FF
         })
@@ -82,7 +125,7 @@
 
       //right palm
       window.rightPalm = new THREE.Mesh(
-        new THREE.SphereGeometry( 30, 32, 32 ),
+        new THREE.SphereGeometry( 10, 32, 32 ),
         new THREE.MeshLambertMaterial({ 
           color: 0xFF0000
         })
@@ -94,6 +137,7 @@
       var angleZ = 0;
       var angleY = 0;
       var length = 0;
+      var center = 0;
 
       //request animation frame and connect to leap socket
       Leap.loop(function(frame) {
@@ -132,17 +176,25 @@
               }
             }
 
+            //set 2 hand variable calculations
             length = Math.abs(frame.hands[1].palmPosition[0] - frame.hands[0].palmPosition[0])
             angleZ = frame.hands[1].palmPosition[1] - frame.hands[0].palmPosition[1]
             angleY = frame.hands[1].palmPosition[2] - frame.hands[0].palmPosition[2]
+            center = new THREE.Vector3( (frame.hands[1].palmPosition[0]+frame.hands[0].palmPosition[0])/2, (frame.hands[1].palmPosition[1]+frame.hands[0].palmPosition[1])/2 - 200, (frame.hands[1].palmPosition[2]+frame.hands[0].palmPosition[2])/2  )
 
-            console.log( "length: " + Math.round(length) + ", angleZ: "+ Math.round(angleZ) + ", angleY: " + Math.round(angleY) )
+            console.log( "length: " + Math.round(length) + ", angleZ: "+ Math.round(angleZ) + ", angleY: " + Math.round(angleY) + ", center: " + center )
 
-            airplane.scale.x = airplane.scale.y = airplane.scale.z = length/200
-            airplane.rotation.z = -angleZ/100
-            airplane.rotation.y = angleY/100
+            earthObject.scale.x = earthObject.scale.y = earthObject.scale.z = length/200
+            earthObject.rotation.z = -angleZ/100
+            earthObject.rotation.y = angleY/100
+            earthObject.position = center;
+
           }
 
+            torus1.rotation.y += .004
+            torus2.rotation.y += .004
+            earthCont.rotation.y += .002
+            earthWireframe.rotation.y += .002
         }
 
 
