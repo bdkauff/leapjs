@@ -72,9 +72,14 @@
       //earth continents
       window.earthCont = new THREE.Mesh(
         new THREE.SphereGeometry( 40, 32, 32 ),
-        new THREE.MeshBasicMaterial({ 
+        new THREE.MeshPhongMaterial({ 
           color: 0xacd3e3,
           transparent: true,
+          // specular: 0xacd3e3,
+          ambient: 0xe4e6b0,
+          // shininess: 2,
+          // refractionRatio: 0,
+          // reflectivity: 2,
           map: THREE.ImageUtils.loadTexture('media/earthCont2.png')
         })
       )
@@ -111,65 +116,15 @@
 
 
 
-      //particle system
-      var fingerPosX = 0;
-      var fingerPosY = 0;
-      var fingerPosZ = 0;
-      attributes = []
-      numParticles = 250
-
-      sprite = THREE.ImageUtils.loadTexture('media/particle.png')
-      material =  new THREE.ParticleBasicMaterial( {
-                color: 0xFFFFFF,
-                size: 20, 
-                map: sprite,
-                transparent: true,
-                // opacity: .1,
-                // blending: THREE.AdditiveBlending
-               } )
-
-
-      geometry = new THREE.Geometry()
-      for(var i=0; i < numParticles; i++){
-        position = new THREE.Vector3( 0, 0, 0 )
-        velocity = new THREE.Vector3( Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5 )
-        force = new THREE.Vector3( 0, 0, 0 )
-        geometry.vertices.push( position )
-        var thisAttr = { vel: {x: 0, y: Math.random(), z: 0}, lifespan: Math.random() * 2000, acc: Math.random()*2-1 }
-        attributes.push(thisAttr)
-      }
-
-
-      function updateParticle(){
-        for(var i = 0; i< numParticles; i++){
-          v = attributes[i].vel
-          p = particleSys.geometry.vertices[i]
-          attributes[i].lifespan -= 5
-          if( isDead(i) ){
-            p.x = fingerPosX + Math.random()*5
-            p.y = fingerPosY + Math.random()*5
-            p.z = fingerPosZ
-            attributes[i].lifespan = 100
-          }
-        }
-      }
-
-      function isDead(thisone){
-        if(attributes[thisone].lifespan <= 0.0){
-          return true
-        }else{
-          return false
-        }
-      }
-
-
-      particleSys = new THREE.ParticleSystem( geometry, material )
-      particleSys.sortParticles = true
-      scene.add(particleSys)
-
-
-
-
+      //pointer
+      window.point = new THREE.Mesh(
+        new THREE.SphereGeometry( 5, 16, 16 ),
+        new THREE.MeshBasicMaterial({ 
+          color: 0x4073a2
+        })
+      )
+      point.position.set( 0, 0, 0 )
+      scene.add( point )
 
 
       //left palm
@@ -198,6 +153,14 @@
       var angleY = 0;
       var length = 0;
       var center = 0;
+      var shrink = false;
+      var grow = false;
+      var scaledUp = false;
+      var targetScaleUp = 2;
+      var targetScaleDown = 1;
+      var leftHand;
+      var rightHand;
+      var swipeLeft = false, swipeRight = false;
 
       //request animation frame and connect to leap socket
       Leap.loop(function(frame) {
@@ -206,12 +169,38 @@
 
           //if user is pointing with single fingure
           if(frame.pointables.length > 0){
-            console.log(frame.pointables[0].tipPosition)
-              updateParticle()
-              fingerPosX = frame.pointables[0].tipPosition[0]
-              fingerPosY = frame.pointables[0].tipPosition[1]-200
-              fingerPosZ = frame.pointables[0].tipPosition[2]
+            if(frame.pointables[0].tipPosition[2] < -100){
+              point.position.x = frame.pointables[0].tipPosition[0]*2
+              point.position.y = frame.pointables[0].tipPosition[1]-200
+              point.position.z = frame.pointables[0].tipPosition[2]+200
+              point.visible = true
+            }else{
+              point.visible = false
+            }
           }
+
+
+          //if there is 1 hand in the frame
+          //do swipe motions
+          if(frame.hands.length == 1){
+            var hand = frame.hands[0];
+            // console.log(hand.palmPosition[0])
+
+            //swipe left
+            //if hand is in left half of screen and is moving fast in left direction
+            if(hand.palmPosition[0] < -50 && hand.palmVelocity[0] < -500){
+              console.log("swipe left")
+              swipeLeft = true;
+            }
+
+            //swipe right
+            if(hand.palmPosition[0] > 0 && hand.palmVelocity[0] > 50){
+              console.log("swipe right")
+              swipeRight = true;
+            }
+          }
+
+
 
           //if there are 2 hands in the frame
           if(frame.hands.length == 2){
@@ -225,10 +214,12 @@
                   leftPalm.position.x = hand.palmPosition[0]
                   leftPalm.position.y = hand.palmPosition[1]-200
                   leftPalm.position.z = hand.palmPosition[2]
+                  leftHand = hand;
                 }else{
                   rightPalm.position.x = hand.palmPosition[0]
                   rightPalm.position.y = hand.palmPosition[1]-200
                   rightPalm.position.z = hand.palmPosition[2]
+                  rightHand = hand;
                 }
               }
               //confirm as right hand - if not act as left hand
@@ -237,31 +228,72 @@
                   rightPalm.position.x = hand.palmPosition[0]
                   rightPalm.position.y = hand.palmPosition[1]-200
                   rightPalm.position.z = hand.palmPosition[2]
+                  rightHand = hand;
                 }else{
                   leftPalm.position.x = hand.palmPosition[0]
                   leftPalm.position.y = hand.palmPosition[1]-200
                   leftPalm.position.z = hand.palmPosition[2]
+                  leftHand = hand;
                 }
               }
             }
 
+            
+            if(rightHand.palmVelocity[0] > 300 && !shrink  && length > 250) grow = true
+            if(rightHand.palmVelocity[0] < -100 && !grow && length < 170) shrink = true
+
+
             //set 2 hand variable calculations
-            length = Math.abs(frame.hands[1].palmPosition[0] - frame.hands[0].palmPosition[0])
-            angleZ = frame.hands[1].palmPosition[1] - frame.hands[0].palmPosition[1]
-            angleY = frame.hands[1].palmPosition[2] - frame.hands[0].palmPosition[2]
+            length = Math.abs(rightHand.palmPosition[0] - leftHand.palmPosition[0])
+            angleZ = rightHand.palmPosition[1] - leftHand.palmPosition[1]
+            angleY = leftHand.palmPosition[2] - rightHand.palmPosition[2]
             center = new THREE.Vector3( (frame.hands[1].palmPosition[0]+frame.hands[0].palmPosition[0])/2, (frame.hands[1].palmPosition[1]+frame.hands[0].palmPosition[1])/2 - 200, (frame.hands[1].palmPosition[2]+frame.hands[0].palmPosition[2])/2  )
 
-            console.log( "length: " + Math.round(length) + ", angleZ: "+ Math.round(angleZ) + ", angleY: " + Math.round(angleY) + ", center: " + center )
+            //console.log(rightHand.palmVelocity[0])
 
-            earthObject.scale.x = earthObject.scale.y = earthObject.scale.z = length/200
-            earthObject.rotation.z = -angleZ/100
-            earthObject.rotation.y = angleY/100
-            earthObject.position = center;
+            if(scaledUp){
+              earthObject.rotation.z = angleZ/100
+              earthObject.rotation.y = angleY/100
+            }
+
+
+            //console.log( "length: " + Math.round(length) + ", angleZ: "+ Math.round(angleZ) + ", angleY: " + Math.round(angleY) + ", center: " + center )
+
+           // earthObject.scale.x = earthObject.scale.y = earthObject.scale.z = length/200
+            //earthObject.rotation.z = -angleZ/100
+            //earthObject.rotation.y = angleY/100
+            //earthObject.position = center;
 
           }
 
-            torus1.rotation.y += .004
-            torus2.rotation.y += .004
+            //scale up
+            if(grow){
+              if(earthObject.scale.x < targetScaleUp-.2){
+                  earthObject.scale.x = earthObject.scale.y = earthObject.scale.z += .08
+                  earthObject.position.z += 4
+                  scaledUp = true;
+                }
+              else{
+                grow = false
+              }
+            }
+
+            //scale up
+            if(shrink){
+              if(earthObject.scale.x > targetScaleDown+.2){
+                  earthObject.scale.x = earthObject.scale.y = earthObject.scale.z -= .08
+                  earthObject.position.z -= 4
+                  scaledUp = false;
+                }
+              else{
+                shrink = false
+              }
+            }
+
+            // console.log("s : " + shrink + ", g : " + grow)
+
+            torus1.rotation.y += .009
+            torus2.rotation.y += .009
             earthCont.rotation.y += .002
             earthWireframe.rotation.y += .002
         }
