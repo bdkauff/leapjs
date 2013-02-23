@@ -1,0 +1,167 @@
+<html>
+  <head>
+    <title>Iron Man 2 - Leap</title>
+    <style>
+      body{margin: 0px; padding: 0px;}
+      canvas { width: 100%; height: 100%; background-color: black; }
+    </style>
+    <script src="scripts/three.js"></script>
+    <script charset="utf-8" src="scripts/ColladaLoader.js"></script>
+    <script src="scripts/leap.js"></script>
+  </head>
+  <body>
+    <script>
+      //create scene
+      var scene = new THREE.Scene();
+      var renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement); 
+
+
+      // create a Directional light as pretend sunshine.
+      directional = new THREE.DirectionalLight( 0xCCCCCC, 1.2 )
+      directional.castShadow = true
+      directional.position.set( 100, 200, 300 )
+      directional.target.position.copy( new THREE.Vector3(0,0,0) )
+      directional.shadowCameraTop     =  1000
+      directional.shadowCameraRight   =  1000
+      directional.shadowCameraBottom  = -1000
+      directional.shadowCameraLeft    = -1000
+      directional.shadowCameraNear    =  600
+      directional.shadowCameraFar     = -600
+      directional.shadowBias          =   -0.0001
+      directional.shadowDarkness      =    0.4
+      directional.shadowMapWidth      = directional.shadowMapHeight = 2048
+      scene.add( directional )
+
+      window.ambient = new THREE.AmbientLight( 0x666666 )
+      scene.add( ambient )
+
+
+
+      //add camera
+      WIDTH      = window.innerWidth,
+      HEIGHT     = window.innerHeight,
+      VIEW_ANGLE = 45,
+      ASPECT     = WIDTH / HEIGHT,
+      NEAR       = 0.1,
+      FAR        = 10000
+      window.camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR );
+      camera.lookAt( scene.position )
+      camera.position.set( 0, 0, 290 )
+
+
+    //AIRPLANE MODEL
+    airplane = new THREE.Object3D()
+    var modelPlane;
+    var loader = new THREE.ColladaLoader();
+    loader.options.convertUpAxis = true;
+    loader.load( 'media/Av8B.dae', function ( collada ) {
+      modelPlane = collada.scene;
+      modelPlane.scale.x =modelPlane.scale.y =modelPlane.scale.z = 12;
+      modelPlane.position.x= 0;
+      modelPlane.position.y= -20;
+  
+      modelPlane.rotation.set(0,0,0); // Set initial rotation
+  
+      airplane.add(modelPlane)
+    });
+    scene.add(airplane)
+
+
+      //left palm
+      window.leftPalm = new THREE.Mesh(
+        new THREE.SphereGeometry( 30, 32, 32 ),
+        new THREE.MeshLambertMaterial({ 
+          color: 0x0000FF
+        })
+      )
+      leftPalm.position.set( 0, 0, 0 )
+      scene.add( leftPalm )
+
+
+      //right palm
+      window.rightPalm = new THREE.Mesh(
+        new THREE.SphereGeometry( 30, 32, 32 ),
+        new THREE.MeshLambertMaterial({ 
+          color: 0xFF0000
+        })
+      )
+      rightPalm.position.set( 0, 0, 0 )
+      scene.add( rightPalm )
+
+
+      var angleZ = 0;
+      var angleY = 0;
+      var length = 0;
+
+      //request animation frame and connect to leap socket
+      Leap.loop(function(frame) {
+
+        if(frame.hands != undefined){
+
+          //if there are 2 hands in the frame
+          if(frame.hands.length == 2){
+            //loop through the two hands
+            for (var handId = 0; handId < frame.hands.length; handId++){
+              var hand = frame.hands[handId];
+
+              //confirm left hand - if not act as right hand
+              if(handId == 0){
+                if(frame.hands[0].palmPosition[0] < frame.hands[1].palmPosition[0]){
+                  leftPalm.position.x = hand.palmPosition[0]
+                  leftPalm.position.y = hand.palmPosition[1]-200
+                  leftPalm.position.z = hand.palmPosition[2]
+                }else{
+                  rightPalm.position.x = hand.palmPosition[0]
+                  rightPalm.position.y = hand.palmPosition[1]-200
+                  rightPalm.position.z = hand.palmPosition[2]
+                }
+              }
+              //confirm as right hand - if not act as left hand
+              if(handId == 1){
+                if(frame.hands[1].palmPosition[0] > frame.hands[0].palmPosition[0]){
+                  rightPalm.position.x = hand.palmPosition[0]
+                  rightPalm.position.y = hand.palmPosition[1]-200
+                  rightPalm.position.z = hand.palmPosition[2]
+                }else{
+                  leftPalm.position.x = hand.palmPosition[0]
+                  leftPalm.position.y = hand.palmPosition[1]-200
+                  leftPalm.position.z = hand.palmPosition[2]
+                }
+              }
+            }
+
+            length = Math.abs(frame.hands[1].palmPosition[0] - frame.hands[0].palmPosition[0])
+            angleZ = frame.hands[1].palmPosition[1] - frame.hands[0].palmPosition[1]
+            angleY = frame.hands[1].palmPosition[2] - frame.hands[0].palmPosition[2]
+
+            console.log( "length: " + Math.round(length) + ", angleZ: "+ Math.round(angleZ) + ", angleY: " + Math.round(angleY) )
+
+            airplane.scale.x = airplane.scale.y = airplane.scale.z = length/200
+            airplane.rotation.z = -angleZ/100
+            airplane.rotation.y = angleY/100
+          }
+
+        }
+
+
+
+
+        camera.updateProjectionMatrix();
+        camera.lookAt(scene.position)
+        renderer.render(scene, camera)
+      });
+
+      //window resize method
+      window.addEventListener( 'resize', onWindowResize, false );
+      function onWindowResize(){
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+
+          renderer.setSize( window.innerWidth, window.innerHeight );
+      }
+    </script>
+  </body>
+</html>
+
