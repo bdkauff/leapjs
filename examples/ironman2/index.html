@@ -2,16 +2,75 @@
   <head>
     <title>Iron Man 2 - Leap</title>
     <style>
-      body{margin: 0px; padding: 0px;}
-      canvas { width: 100%; height: 100%; background-color: black; background-image: url('media/bg.jpg');}
+      body{margin: 0px; padding: 0px; color: #3fb4b4; font-size: 4px;}
+      canvas { width: 100%; height: 100%; background-color: black; position: absolute; left: 0px;}
     </style>
     <script src="scripts/three.js"></script>
+
+    <script src="scripts/shaders/CopyShader.js"></script>
+    <script src="scripts/shaders/FilmShader.js"></script>
+
+    <script src="scripts/postprocessing/EffectComposer.js"></script>
+    <script src="scripts/postprocessing/RenderPass.js"></script>
+    <script src="scripts/postprocessing/MaskPass.js"></script>
+    <script src="scripts/postprocessing/ShaderPass.js"></script>
+
     <script src="scripts/leap.js"></script>
   </head>
   <body>
     <script>
+      var createBackgroundElements = function(){
+
+        window.uiLeftLightsMaterial = new THREE.MeshBasicMaterial({
+            transparent: true,
+            opacity: .5,
+            map: THREE.ImageUtils.loadTexture('media/interfacelights.jpg')
+        })
+        window.uiLeftLights = new THREE.Mesh(new THREE.PlaneGeometry(256, 716), uiLeftLightsMaterial);
+        uiLeftLights.position.z = -900
+        uiLeftLights.position.x = -660
+        uiLeftLights.position.y = 100
+        uiLeftLights.overdraw = true;
+        userInterface.add(uiLeftLights);   
+
+        window.uiCenterTargetMaterial = new THREE.MeshBasicMaterial({
+            transparent: true,
+            map: THREE.ImageUtils.loadTexture('media/interfacecenter.jpg')
+        })
+        window.uiCenterTarget = new THREE.Mesh(new THREE.PlaneGeometry(418, 418), uiCenterTargetMaterial );
+        uiCenterTarget.position.z = -900
+        uiCenterTarget.overdraw = true;
+        userInterface.add(uiCenterTarget);   
+
+
+        window.uiRing1 = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshBasicMaterial({
+            transparent: true,
+            map: THREE.ImageUtils.loadTexture('media/interfacering1.png')
+        }) );
+        uiRing1.position.z = -870
+        userInterface.add(uiRing1);   
+
+        window.uiRing2 = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshBasicMaterial({
+            transparent: true,
+            map: THREE.ImageUtils.loadTexture('media/interfacering2.png')
+        }) );
+        uiRing2.position.z = -880
+        userInterface.add(uiRing2);   
+
+        window.uiRing3 = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshBasicMaterial({
+            transparent: true,
+            map: THREE.ImageUtils.loadTexture('media/interfacering3.png')
+        }) );
+        uiRing3.position.z = -890
+        userInterface.add(uiRing3);   
+
+        scene.add(userInterface)
+      }
+
+
       //create scene
       var scene = new THREE.Scene();
+      var userInterface = new THREE.Object3D()
       var renderer = new THREE.WebGLRenderer();
       renderer.setSize(window.innerWidth, window.innerHeight);
       document.body.appendChild(renderer.domElement); 
@@ -55,7 +114,7 @@
 
       //earth wireframe
       window.earthWireframe = new THREE.Mesh(
-        new THREE.SphereGeometry( 40+1, 32, 32 ),
+        new THREE.SphereGeometry( 10+.1, 32, 32 ),
         new THREE.MeshBasicMaterial({ 
           color: 0xabd7e5,
           wireframe: true,
@@ -71,13 +130,13 @@
 
       //earth continents
       window.earthCont = new THREE.Mesh(
-        new THREE.SphereGeometry( 40, 32, 32 ),
+        new THREE.SphereGeometry( 10, 32, 32 ),
         new THREE.MeshPhongMaterial({ 
           color: 0xacd3e3,
           transparent: true,
-          // specular: 0xacd3e3,
+          specular: 0xacd3e3,
           ambient: 0xe4e6b0,
-          // shininess: 2,
+          shininess: 2,
           // refractionRatio: 0,
           // reflectivity: 2,
           map: THREE.ImageUtils.loadTexture('media/earthCont2.png')
@@ -88,9 +147,9 @@
 
       //earth continents
       window.torus1 = new THREE.Mesh(
-        new THREE.TorusGeometry( 43, 1, 30, 30 ),
+        new THREE.TorusGeometry( 10.5, .2, 30, 30 ),
         new THREE.MeshBasicMaterial({ 
-          color: 0x4073a2,
+          color: 0xb6d9de,
           transparent: true,
           opacity: .8
         })
@@ -100,9 +159,9 @@
 
       //earth continents
       window.torus2 = new THREE.Mesh(
-        new THREE.TorusGeometry( 43, 1, 30, 30 ),
+        new THREE.TorusGeometry( 10.5, .2, 30, 30 ),
         new THREE.MeshBasicMaterial({ 
-          color: 0x4073a2,
+          color: 0xb6d9de,
           transparent: true,
           opacity: .8
         })
@@ -118,9 +177,9 @@
 
       //pointer
       window.point = new THREE.Mesh(
-        new THREE.SphereGeometry( 5, 16, 16 ),
-        new THREE.MeshBasicMaterial({ 
-          color: 0x4073a2
+        new THREE.SphereGeometry( 2, 16, 16 ),
+        new THREE.MeshPhongMaterial({ 
+          color: 0x02bcab
         })
       )
       point.position.set( 0, 0, 0 )
@@ -129,9 +188,9 @@
 
       //left palm
       window.leftPalm = new THREE.Mesh(
-        new THREE.SphereGeometry( 10, 32, 32 ),
+        new THREE.SphereGeometry( 2, 32, 32 ),
         new THREE.MeshLambertMaterial({ 
-          color: 0x0000FF
+          color: 0x02bcab
         })
       )
       leftPalm.position.set( 0, 0, 0 )
@@ -140,13 +199,27 @@
 
       //right palm
       window.rightPalm = new THREE.Mesh(
-        new THREE.SphereGeometry( 10, 32, 32 ),
+        new THREE.SphereGeometry( 2, 32, 32 ),
         new THREE.MeshLambertMaterial({ 
-          color: 0xFF0000
+          color: 0x02bcab
         })
       )
       rightPalm.position.set( 0, 0, 0 )
       scene.add( rightPalm )
+
+
+      createBackgroundElements();
+
+
+      // postprocessing
+      window.composer = new THREE.EffectComposer( renderer );
+      composer.addPass( new THREE.RenderPass( scene, camera ) );
+
+      window.effect = new THREE.ShaderPass( THREE.FilmShader );
+      effect.uniforms[ 'grayscale' ].value = 0;
+      effect.renderToScreen = true;
+      composer.addPass( effect );
+
 
 
       var angleZ = 0;
@@ -156,7 +229,7 @@
       var shrink = false;
       var grow = false;
       var scaledUp = false;
-      var targetScaleUp = 2;
+      var targetScaleUp = 3;
       var targetScaleDown = 1;
       var leftHand;
       var rightHand;
@@ -194,7 +267,7 @@
             }
 
             //swipe right
-            if(hand.palmPosition[0] > 0 && hand.palmVelocity[0] > 50){
+            if(hand.palmPosition[0] > 0 && hand.palmVelocity[0] > 500){
               console.log("swipe right")
               swipeRight = true;
             }
@@ -270,7 +343,7 @@
             if(grow){
               if(earthObject.scale.x < targetScaleUp-.2){
                   earthObject.scale.x = earthObject.scale.y = earthObject.scale.z += .08
-                  earthObject.position.z += 4
+                  earthObject.position.z += 6
                   scaledUp = true;
                 }
               else{
@@ -282,7 +355,7 @@
             if(shrink){
               if(earthObject.scale.x > targetScaleDown+.2){
                   earthObject.scale.x = earthObject.scale.y = earthObject.scale.z -= .08
-                  earthObject.position.z -= 4
+                  earthObject.position.z -= 6
                   scaledUp = false;
                 }
               else{
@@ -296,6 +369,34 @@
             torus2.rotation.y += .009
             earthCont.rotation.y += .002
             earthWireframe.rotation.y += .002
+
+            //ui animations
+            uiCenterTarget.rotation.z-=.001
+            uiCenterTargetMaterial.opacity = Math.random()+.8
+            uiLeftLightsMaterial.opacity = Math.random()+.5
+            uiRing1.rotation.z+=.002
+            uiRing2.rotation.z-=.003
+            uiRing3.rotation.z+=.005
+
+
+            if(swipeLeft){
+              if(userInterface.position.x >= -4000){
+                userInterface.position.x-=200;
+                userInterface.position.z-=60;
+              }else{
+                swipeLeft=false;
+              }
+            }
+
+            if(swipeRight){
+              if(userInterface.position.x < 0){
+                userInterface.position.x+=200;
+                userInterface.position.z+=60;
+              }else{
+                swipeRight=false;
+              }
+            }
+
         }
 
 
@@ -303,8 +404,10 @@
 
         camera.updateProjectionMatrix();
         camera.lookAt(scene.position)
-        renderer.render(scene, camera)
+        // renderer.render(scene, camera)
+        composer.render();
       });
+
 
       //window resize method
       window.addEventListener( 'resize', onWindowResize, false );
