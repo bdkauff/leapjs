@@ -132,7 +132,7 @@
       window.earthCont = new THREE.Mesh(
         new THREE.SphereGeometry( 10, 32, 32 ),
         new THREE.MeshPhongMaterial({ 
-          color: 0xacd3e3,
+          color: 0x3fb4b4,
           transparent: true,
           specular: 0xacd3e3,
           ambient: 0xe4e6b0,
@@ -149,7 +149,7 @@
       window.torus1 = new THREE.Mesh(
         new THREE.TorusGeometry( 10.5, .2, 30, 30 ),
         new THREE.MeshBasicMaterial({ 
-          color: 0xb6d9de,
+          color: 0x3fb4b4,
           transparent: true,
           opacity: .8
         })
@@ -161,7 +161,7 @@
       window.torus2 = new THREE.Mesh(
         new THREE.TorusGeometry( 10.5, .2, 30, 30 ),
         new THREE.MeshBasicMaterial({ 
-          color: 0xb6d9de,
+          color: 0x3fb4b4,
           transparent: true,
           opacity: .8
         })
@@ -313,7 +313,7 @@
 
             
             if(rightHand.palmVelocity[0] > 300 && !shrink  && length > 250) grow = true
-            if(rightHand.palmVelocity[0] < -100 && !grow && length < 170) shrink = true
+            if(rightHand.palmVelocity[0] < -100 && !grow && length < 120) shrink = true
 
 
             //set 2 hand variable calculations
