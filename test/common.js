@@ -1,8 +1,34 @@
-if (typeof(exports) === 'undefined') exports = {}
+if (typeof(exports) === 'undefined') {
+  exports = {};
+}
 
 var fingerId = 0
   , handId = 0
   , frameId =0;
+
+var fakeController = exports.fakeController = function(opts) {
+  var controller = new Leap.Controller(opts)
+  var connection = controller.connection;
+
+  connection.setupSocket = function() {
+    setTimeout(function() { connection.handleOpen() }, 10)
+    var socket = {
+      messages: [],
+      send: function(message) {
+        socket.messages.push(message);
+      },
+      close: function() {
+        connection.handleClose();
+      }
+    };
+    connection.on('connect', function() {
+      connection.handleData(JSON.stringify({version: 1}))
+    });
+    return socket;
+  }
+
+  return controller;
+}
 
 var fakeFrame = exports.fakeFrame = function(opts) {
   if (opts === undefined) opts = {};
