@@ -322,20 +322,11 @@
             angleY = leftHand.palmPosition[2] - rightHand.palmPosition[2]
             center = new THREE.Vector3( (frame.hands[1].palmPosition[0]+frame.hands[0].palmPosition[0])/2, (frame.hands[1].palmPosition[1]+frame.hands[0].palmPosition[1])/2 - 200, (frame.hands[1].palmPosition[2]+frame.hands[0].palmPosition[2])/2  )
 
-            //console.log(rightHand.palmVelocity[0])
 
             if(scaledUp){
               earthObject.rotation.z = angleZ/100
               earthObject.rotation.y = angleY/100
             }
-
-
-            //console.log( "length: " + Math.round(length) + ", angleZ: "+ Math.round(angleZ) + ", angleY: " + Math.round(angleY) + ", center: " + center )
-
-           // earthObject.scale.x = earthObject.scale.y = earthObject.scale.z = length/200
-            //earthObject.rotation.z = -angleZ/100
-            //earthObject.rotation.y = angleY/100
-            //earthObject.position = center;
 
           }
 
@@ -363,7 +354,6 @@
               }
             }
 
-            // console.log("s : " + shrink + ", g : " + grow)
 
             torus1.rotation.y += .009
             torus2.rotation.y += .009
