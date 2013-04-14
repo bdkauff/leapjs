@@ -1,7 +1,7 @@
 <html>
   <head>
     <!-- example coded by Robbie Tilton [www.RobbieTilton.com] -->
-    <title>Extended Gestures - Leap</title>
+    <title>Extended gestures - Leap</title>
 
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
     <script src="../leap.js"></script>
@@ -80,7 +80,7 @@
 
 
             // WAVE ********
-            if(frame.fingers.length == 5){
+            if(frame.fingers.length >= 3){
               waveActive++
 
               if(waveActive > 100)
