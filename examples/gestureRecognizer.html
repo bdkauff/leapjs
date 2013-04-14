@@ -1,0 +1,131 @@
+<html>
+  <head>
+    <!-- example coded by Robbie Tilton [www.RobbieTilton.com] -->
+    <title>Extended Gestures - Leap</title>
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+    <script src="../leap.js"></script>
+
+    <style>
+      body{padding: 0px; margin: 0px; font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif; }
+      h1{padding: 50px;}
+    </style>
+
+  </head>
+  <body>
+
+    <h1>Gesture: <span id="gesture">none</span></h1>
+
+
+    <script>
+      var pointActive = 0, waveActive = 0;
+
+      //request animation frame and connect to leap socket
+      Leap.loop({enableGestures: true}, function(frame) {
+
+        if(frame.hands != undefined){
+
+          
+          // read if there's a gesture
+          if(frame.gestures.length > 0){
+              //console.log(frame.gestures[0])
+
+              // TAP GESTURE *******
+              if(frame.gestures[0].type == "keyTap"){
+                  console.log("taped")
+                  $("#gesture").text("tapped");
+              }
+
+              // SWIPE GESTURE *********
+              if(frame.gestures[0].type == "swipe"){
+                  if(frame.gestures[0].direction[0] < -.7){
+                    console.log("swiped right")  
+                    $("#gesture").text("swipe right");
+                  }
+                  if(frame.gestures[0].direction[0] > .7){
+                    console.log("swiped left")  
+                    $("#gesture").text("swipe left");
+                  }
+                  if(frame.gestures[0].direction[2] > .7){
+                    console.log("swiped down")  
+                    $("#gesture").text("swipe down");
+                  }
+                  if(frame.gestures[0].direction[2] < -.7){
+                    console.log("swiped up")  
+                    $("#gesture").text("swipe up");
+                  }
+
+              }
+          }
+
+
+          //if there are 2 hands in the frame
+          if(frame.hands.length == 0){
+            $("#gesture").text("none");
+            pointActive = 0;
+          }
+
+          //if there is 1 hand in the frame
+          if(frame.hands.length == 1){
+
+              // POINT SYMBOL *****
+            if(frame.fingers.length == 1){
+              pointActive++;
+
+              if(pointActive > 100)
+                $("#gesture").text("point");
+            }else{
+              pointActive =0
+            }
+
+
+            // WAVE ********
+            if(frame.fingers.length == 5){
+              waveActive++
+
+              if(waveActive > 100)
+                $("#gesture").text("wave");
+
+            }else{
+              waveActive=0
+            }
+
+
+            // //OK SYMBOL *****
+            // if(frame.fingers.length == 3){
+            //   $("#gesture").text("ok");
+            //   console.log("test")
+            // }
+
+          }
+
+          //CAPTURE PHOTO *****
+          if(frame.hands.length == 2 && frame.fingers.length == 4){
+            $("#gesture").text("picture");
+
+            var clickerFinger;
+            var otherFinger = [100,300,0];
+            for(var i=0; i< frame.fingers.length; i++){
+               //console.log(frame.fingers[0].tipPosition[1])
+              if(frame.fingers[i].tipPosition[0] < otherFinger[0] && frame.fingers[i].tipPosition[1] < otherFinger[1]){
+                //console.log("ttest");
+                clickerFinger = frame.fingers[i];
+                otherFinger = clickerFinger;
+              }
+            }
+
+            //PICTURE CLICKED ********
+            if(clickerFinger.tipVelocity[2]>100)
+              $("#gesture").text("picture - TAKE");
+
+          }
+
+
+
+        }
+   
+      });
+    </script>
+
+  </body>
+</html>
